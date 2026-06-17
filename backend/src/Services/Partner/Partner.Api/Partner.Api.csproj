@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>InsurTech.Partner.Api</RootNamespace>
+    <AssemblyName>Partner.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\InsurTech.BuildingBlocks\InsurTech.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

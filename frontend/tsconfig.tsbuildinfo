@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/ui.tsx","./src/vite-env.d.ts","./src/pages/claimdetails.tsx","./src/pages/fileclaim.tsx","./src/pages/fraudalerts.tsx","./src/pages/recentclaims.tsx","./src/pages/underwritingqueue.tsx"],"version":"5.9.3"}

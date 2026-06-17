@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>InsurTech.Claims.Domain</RootNamespace>
+    <AssemblyName>Claims.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\InsurTech.BuildingBlocks\InsurTech.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

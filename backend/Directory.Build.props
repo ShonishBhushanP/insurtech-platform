@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    Common build settings for every InsurTech backend project.
+    Mirrors the LLD's ".NET 8 minimal API" baseline (Appendix A.1.2 / A.2.2 / A.3.2).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Target .NET 8 (per the design) but roll forward to a newer installed runtime when the
+      8.0 runtime/shared framework is absent. Lets the apps run on a .NET 10-only machine.
+    -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+</Project>

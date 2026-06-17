@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>InsurTech.DocMgmt.Api</RootNamespace>
+    <AssemblyName>DocMgmt.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.22.2" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.43.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\InsurTech.BuildingBlocks\InsurTech.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>
