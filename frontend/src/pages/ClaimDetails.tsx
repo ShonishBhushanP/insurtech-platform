@@ -107,35 +107,6 @@ export default function ClaimDetails() {
             </div>
           </div>
 
-          {docCount > 0 && (
-            <ul className="timeline" style={{ marginTop: 12 }}>
-              {claim.documents.map((d) => {
-                const meta = docMeta[d.documentId];
-                const fields = meta?.extractedFields
-                  ? Object.entries(meta.extractedFields).filter(([k]) => !k.startsWith("_"))
-                  : [];
-                return (
-                  <li key={d.documentId}>
-                    <div className="t-status">{d.type} {d.verified ? <span className="badge green">verified</span> : <span className="badge amber">pending</span>}</div>
-                    <div className="t-note"><code>{d.documentId}</code></div>
-                    {fields.length > 0 && (
-                      <div className="t-note" style={{ marginTop: 4 }}>
-                        <span className="badge blue">OCR · {meta?.ocrEngine}</span>
-                        <table style={{ marginTop: 6 }}>
-                          <tbody>
-                            {fields.map(([k, v]) => (
-                              <tr key={k}><td style={{ padding: "2px 8px 2px 0", color: "#64748b" }}>{k}</td><td style={{ padding: "2px 0" }}>{v}</td></tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
           {claim.decisionReason && <p className="muted" style={{ marginTop: 12 }}>Decision note: {claim.decisionReason}</p>}
         </div>
 
@@ -147,6 +118,52 @@ export default function ClaimDetails() {
           </div>
           {claim.status === "Paid" && <p className="muted" style={{ marginTop: 12 }}>Payment captured — see lifecycle below.</p>}
         </div>
+      </div>
+
+      {/* Documents & extracted data (Document Intelligence OCR output) */}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Documents &amp; extracted data</h3>
+        {docCount === 0 ? (
+          <div className="empty">No documents attached to this claim.</div>
+        ) : (
+          <div className="grid cols-2">
+            {claim.documents.map((d) => {
+              const meta = docMeta[d.documentId];
+              const fields = meta?.extractedFields
+                ? Object.entries(meta.extractedFields).filter(([k]) => !k.startsWith("_"))
+                : [];
+              const isImage = (meta?.mimeType ?? "").startsWith("image/");
+              return (
+                <div key={d.documentId} className="card" style={{ margin: 0, background: "var(--surface-2)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ fontSize: 28 }}>{isImage ? "🖼️" : "📄"}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{meta?.fileName ?? d.type}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{meta?.mimeType ?? "—"} · {d.type}</div>
+                    </div>
+                    {d.verified ? <span className="badge green">verified</span> : <span className="badge amber">pending</span>}
+                  </div>
+                  {meta?.ocrEngine && <div style={{ marginTop: 8 }}><span className="badge blue">OCR · {meta.ocrEngine}</span></div>}
+                  {fields.length > 0 ? (
+                    <table style={{ marginTop: 8 }}>
+                      <tbody>
+                        {fields.map(([k, v]) => (
+                          <tr key={k}>
+                            <td style={{ padding: "3px 10px 3px 0", color: "#64748b", whiteSpace: "nowrap", verticalAlign: "top" }}>{k}</td>
+                            <td style={{ padding: "3px 0" }}>{v}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Awaiting OCR / form recognition…</p>
+                  )}
+                  <div className="muted" style={{ fontSize: 11, marginTop: 8 }}><code>{d.documentId}</code></div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Lifecycle history */}
