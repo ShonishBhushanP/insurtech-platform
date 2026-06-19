@@ -26,9 +26,11 @@ param(
 $ErrorActionPreference = "Continue"
 $az = (Get-Command az -ErrorAction SilentlyContinue).Source
 if (-not $az) { $az = "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd" }
-# Corporate-proxy CA bundle (Windows) — only set when present, so this also runs in Azure Cloud Shell.
-$caBundle = Join-Path $env:USERPROFILE 'az-cacert.pem'
-if ($env:USERPROFILE -and (Test-Path $caBundle)) { $env:REQUESTS_CA_BUNDLE = $caBundle }
+# Corporate-proxy CA bundle (Windows) — only set when present, so this also runs in Azure Cloud Shell (Linux).
+if ($env:USERPROFILE) {
+  $caBundle = Join-Path $env:USERPROFILE 'az-cacert.pem'
+  if (Test-Path $caBundle) { $env:REQUESTS_CA_BUNDLE = $caBundle }
+}
 
 $repo = Split-Path -Parent $PSScriptRoot
 $ctx = Join-Path $repo "backend"   # Docker build context
@@ -47,8 +49,11 @@ $svc = [ordered]@{
   gateway      = @{ proj = "src/Gateway/InsurTech.Gateway/InsurTech.Gateway.csproj";      dll = "InsurTech.Gateway.dll" }
 }
 
-# 1. ACR (admin enabled for credential-based pull — no role assignment needed)
-$acr = "$($NamePrefix)acr$((($ResourceGroup.GetHashCode() -band 0x7fffffff)).ToString().Substring(0,6))"
+# 1. ACR (admin enabled for credential-based pull — no role assignment needed).
+#    Deterministic, RG-derived name (SHA-256 — stable across machines/PowerShell versions, unlike GetHashCode).
+$sha = [System.Security.Cryptography.SHA256]::Create()
+$rgHash = [System.BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($ResourceGroup))).Replace('-', '').ToLower().Substring(0, 8)
+$acr = "$($NamePrefix)acr$rgHash"
 Write-Host "==> ACR $acr"
 & $az acr create -n $acr -g $ResourceGroup --sku Basic --admin-enabled true -o none
 if ($LASTEXITCODE -ne 0) { Write-Host "ACR create failed (token? run az login)"; exit 1 }

@@ -22,7 +22,11 @@ param(
 $ErrorActionPreference = "Continue"
 $az = (Get-Command az -ErrorAction SilentlyContinue).Source
 if (-not $az) { $az = "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd" }
-$env:REQUESTS_CA_BUNDLE = "$env:USERPROFILE\az-cacert.pem"
+# Corporate-proxy CA bundle (Windows only); skipped in Azure Cloud Shell (Linux).
+if ($env:USERPROFILE) {
+  $caBundle = Join-Path $env:USERPROFILE 'az-cacert.pem'
+  if (Test-Path $caBundle) { $env:REQUESTS_CA_BUNDLE = $caBundle }
+}
 
 $repo = Split-Path -Parent $PSScriptRoot
 $proj = Join-Path $repo "backend\src\Services\Claims\Claims.Functions"
