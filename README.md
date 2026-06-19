@@ -156,6 +156,14 @@ the Azure adapters activate — **no code change**.
 data + platform tier, builds/pushes images to ACR, and deploys the services to Container Apps with
 Managed Identity + RBAC.
 
+**Sandbox / locked-down machine:** an Owner-level subscription is needed for the full RBAC path;
+for a learner sandbox (Contributor only) use the no-RBAC variants — `infra/sandbox-sql.bicep`
+(Azure SQL, done), `infra/deploy-frontend.ps1` (Static Web App / Storage site), and
+`infra/sandbox-apps.bicep` + `infra/deploy-backend.ps1` (Container Apps with ACR-admin + SQL-auth).
+If a corporate proxy (e.g. Zscaler) blocks `az acr build` uploads or the token expires every few
+minutes, **run the deploy from Azure Cloud Shell** — see [`infra/CLOUD-SHELL.md`](infra/CLOUD-SHELL.md).
+It runs inside Azure, bypassing the proxy and the short-lived token.
+
 ---
 
 ## Repository layout
