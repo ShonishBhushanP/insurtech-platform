@@ -35,16 +35,8 @@ export default function FileClaim() {
           sensitivityClass: "PII-Image",
           ownerPolicyId: policyId, relatedClaimId: null, expectedSizeBytes: file.size,
         });
-        // Azure Blob mode: PUT the bytes to the returned user-delegation SAS URL.
-        if (doc.uploadUrl.startsWith("https://") && !doc.uploadUrl.includes("localhost")) {
-          await fetch(doc.uploadUrl, {
-            method: "PUT",
-            headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type || "application/octet-stream" },
-            body: file,
-          });
-        }
-        // Trigger scan + OCR (Document Intelligence) + promote pipeline.
-        await api.promoteDocument(doc.documentId);
+        // Upload the bytes → scan + OCR (Document Intelligence) + promote pipeline.
+        await api.promoteDocument(doc.documentId, file);
         attachments.push({ documentId: doc.documentId, type: file.type.startsWith("image/") ? "PhotoOfDamage" : "ClaimDocument" });
       }
 

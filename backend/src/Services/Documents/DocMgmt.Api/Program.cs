@@ -22,6 +22,10 @@ string[] allowedMime = { "image/jpeg", "image/png", "image/webp", "application/p
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
 const long MaxSize = 26_214_400; // 25 MB (API spec §3.1.5)
 
+// In-memory content store (Blob immutable container in Azure). Holds the uploaded bytes so the
+// adjuster can preview the document and OCR can read the real image.
+var content = new System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Bytes, string ContentType)>();
+
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "documents" }));
 
 // POST /v1/documents/upload-url (API spec §3.1.5 / LLD A.3.3.1)
@@ -49,27 +53,43 @@ app.MapPost("/v1/documents/upload-url", async (UploadUrlRequest req, IUploadUrlI
         "DocumentUploaded"));
 }).WithTags("Documents");
 
-// Stub direct-PUT target (local issuer only) — stands in for Blob staging + malware scan +
-// OCR/form-recognition (Document Intelligence) + immutable promotion.
-app.MapPut("/v1/documents/{id}/_staging-put", async (string id, IDocumentStore store, IDocumentExtraction ocr, CancellationToken ct) =>
+// Direct-PUT target — receives the file bytes (stands in for Blob staging), runs malware scan +
+// OCR/form-recognition (Document Intelligence) on the real bytes, then promotes to immutable.
+app.MapPut("/v1/documents/{id}/_staging-put", async (string id, HttpRequest http, IDocumentStore store, IDocumentExtraction ocr, CancellationToken ct) =>
 {
     var doc = await store.FindAsync(id, ct);
     if (doc is null) return Error.NotFound("DOC-010", "Document not found.").ToProblem("documents");
 
-    // Run OCR / form recognition, then promote.
-    doc.ExtractedFields = await ocr.ExtractAsync(doc.FileName, doc.MimeType, doc.SensitivityClass, documentUri: null, ct);
+    // Capture the uploaded bytes (if the client sent any).
+    byte[]? bytes = null;
+    if (http.ContentLength is > 0 || http.Body.CanRead)
+    {
+        using var ms = new MemoryStream();
+        await http.Body.CopyToAsync(ms, ct);
+        if (ms.Length > 0) { bytes = ms.ToArray(); content[id] = (bytes, http.ContentType ?? doc.MimeType); }
+    }
+
+    // OCR / form recognition over the real bytes, then promote.
+    doc.ExtractedFields = await ocr.ExtractAsync(doc.FileName, doc.MimeType, doc.SensitivityClass, documentUri: null, content: bytes, ct);
     doc.OcrEngine = ocr.Engine;
     doc.Status = "Promoted";
     await store.UpsertAsync(doc, ct);
     return Results.Ok(new { id, status = "Promoted", ocrEngine = doc.OcrEngine, extractedFields = doc.ExtractedFields,
-        note = "malware-scan clean (stub); OCR complete; promoted to docs-immutable" });
+        hasContent = bytes is not null, note = "malware-scan clean (stub); OCR complete; promoted to docs-immutable" });
 }).WithTags("Documents");
 
-// GET /v1/documents/{id}
+// GET /v1/documents/{id} — metadata
 app.MapGet("/v1/documents/{id}", async (string id, IDocumentStore store, CancellationToken ct) =>
 {
     var doc = await store.FindAsync(id, ct);
     return doc is null ? Error.NotFound("DOC-010", "Document not found.").ToProblem("documents") : Results.Ok(doc);
 }).WithTags("Documents");
+
+// GET /v1/documents/{id}/content — the raw bytes, for preview/download (scoped read SAS in Azure).
+app.MapGet("/v1/documents/{id}/content", (string id) =>
+    content.TryGetValue(id, out var c)
+        ? Results.File(c.Bytes, c.ContentType)
+        : Error.NotFound("DOC-010", "Document content not found.").ToProblem("documents")
+).WithTags("Documents");
 
 app.Run();

@@ -11,6 +11,7 @@ export default function ClaimDetails() {
   const { id = "" } = useParams();
   const [claim, setClaim] = useState<Claim | null>(null);
   const [docMeta, setDocMeta] = useState<Record<string, DocumentMeta>>({});
+  const [preview, setPreview] = useState<string | null>(null); // documentId being previewed
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -133,16 +134,31 @@ export default function ClaimDetails() {
                 ? Object.entries(meta.extractedFields).filter(([k]) => !k.startsWith("_"))
                 : [];
               const isImage = (meta?.mimeType ?? "").startsWith("image/");
+              const typeVerified = meta?.extractedFields?.["documentTypeVerified"];
               return (
                 <div key={d.documentId} className="card" style={{ margin: 0, background: "var(--surface-2)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ fontSize: 28 }}>{isImage ? "🖼️" : "📄"}</div>
+                    {isImage ? (
+                      <img src={api.documentContentUrl(d.documentId)} alt={meta?.fileName}
+                        onClick={() => setPreview(d.documentId)}
+                        style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8, cursor: "pointer", border: "1px solid var(--line)" }} />
+                    ) : (
+                      <div style={{ fontSize: 28 }}>📄</div>
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{meta?.fileName ?? d.type}</div>
                       <div className="muted" style={{ fontSize: 12 }}>{meta?.mimeType ?? "—"} · {d.type}</div>
+                      {isImage && <a style={{ fontSize: 12, cursor: "pointer" }} onClick={() => setPreview(d.documentId)}>Click to preview</a>}
                     </div>
                     {d.verified ? <span className="badge green">verified</span> : <span className="badge amber">pending</span>}
                   </div>
+                  {typeVerified && (
+                    <div style={{ marginTop: 6 }}>
+                      <span className={`badge ${typeVerified.startsWith("true") ? "green" : "amber"}`}>
+                        type {typeVerified.startsWith("true") ? "verified ✓" : "unverified"}
+                      </span>
+                    </div>
+                  )}
                   {meta?.ocrEngine && <div style={{ marginTop: 8 }}><span className="badge blue">OCR · {meta.ocrEngine}</span></div>}
                   {fields.length > 0 ? (
                     <table style={{ marginTop: 8 }}>
@@ -179,6 +195,18 @@ export default function ClaimDetails() {
           ))}
         </ul>
       </div>
+
+      {/* Image preview lightbox */}
+      {preview && (
+        <div onClick={() => setPreview(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.8)", display: "grid", placeItems: "center", zIndex: 50, padding: 24 }}>
+          <div style={{ textAlign: "center" }}>
+            <img src={api.documentContentUrl(preview)} alt="document"
+              style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,.5)" }} />
+            <div style={{ color: "#fff", marginTop: 10, fontSize: 13 }}>{docMeta[preview]?.fileName} — click anywhere to close</div>
+          </div>
+        </div>
+      )}
     </Section>
   );
 }

@@ -83,10 +83,20 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // Simulate the direct-to-blob upload (loopback) so the OCR / promote pipeline runs.
-  promoteDocument: (id: string) => http<unknown>(`/v1/documents/${id}/_staging-put`, { method: "PUT" }),
+  // Upload the file bytes to the documents service (loopback stand-in for direct-to-blob),
+  // which stores them and runs the scan + OCR pipeline.
+  promoteDocument: async (id: string, file?: File) => {
+    const headers: Record<string, string> = {};
+    if (file) headers["Content-Type"] = file.type || "application/octet-stream";
+    const res = await fetch(`${BASE}/v1/documents/${id}/_staging-put`, { method: "PUT", headers, body: file });
+    if (!res.ok) throw new Error(`${res.status} — document upload failed`);
+    return res.json();
+  },
 
   getDocument: (id: string) => http<DocumentMeta>(`/v1/documents/${id}`),
+
+  // Direct URL to the stored bytes — used as an <img src> / download link.
+  documentContentUrl: (id: string) => `${BASE}/v1/documents/${id}/content`,
 
   // ---- Fraud ----
   listFraudCases: (status?: string) =>
