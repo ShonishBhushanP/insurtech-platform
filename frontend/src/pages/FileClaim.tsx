@@ -13,7 +13,7 @@ export default function FileClaim() {
   const [amount, setAmount] = useState(45000);
   const [incidentDate, setIncidentDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState("Rear-end collision at signal; minor rear bumper damage.");
-  const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -26,16 +26,26 @@ export default function FileClaim() {
   async function submit() {
     setError(""); setBusy(true);
     try {
-      // Optional document upload step (direct-to-blob SAS pattern — LLD A.3.3.1).
+      // Optional document upload (direct-to-blob SAS pattern — LLD A.3.3.1).
       const attachments: { documentId: string; type: string }[] = [];
-      if (fileName.trim()) {
+      if (file) {
         const doc = await api.requestUploadUrl({
-          fileName, mimeType: "image/jpeg", sensitivityClass: "PII-Image",
-          ownerPolicyId: policyId, relatedClaimId: null, expectedSizeBytes: 1048576,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          sensitivityClass: "PII-Image",
+          ownerPolicyId: policyId, relatedClaimId: null, expectedSizeBytes: file.size,
         });
-        // Simulate the direct-to-blob upload so the scan + OCR (Document Intelligence) pipeline runs.
+        // Azure Blob mode: PUT the bytes to the returned user-delegation SAS URL.
+        if (doc.uploadUrl.startsWith("https://") && !doc.uploadUrl.includes("localhost")) {
+          await fetch(doc.uploadUrl, {
+            method: "PUT",
+            headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": file.type || "application/octet-stream" },
+            body: file,
+          });
+        }
+        // Trigger scan + OCR (Document Intelligence) + promote pipeline.
         await api.promoteDocument(doc.documentId);
-        attachments.push({ documentId: doc.documentId, type: "PhotoOfDamage" });
+        attachments.push({ documentId: doc.documentId, type: file.type.startsWith("image/") ? "PhotoOfDamage" : "ClaimDocument" });
       }
 
       const res = await api.fileClaim({
@@ -82,8 +92,14 @@ export default function FileClaim() {
         <label>What happened?</label>
         <textarea value={description} maxLength={2000} onChange={(e) => setDescription(e.target.value)} />
 
-        <label>Attach evidence (optional — file name)</label>
-        <input placeholder="damage-photo-1.jpg" value={fileName} onChange={(e) => setFileName(e.target.value)} />
+        <label>Attach evidence (optional)</label>
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        {file && (
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Selected: <strong>{file.name}</strong> ({Math.round(file.size / 1024)} KB · {file.type || "unknown type"})
+          </p>
+        )}
 
         <div className="btn-row">
           <button className="primary" onClick={submit} disabled={busy || !policyId}>
