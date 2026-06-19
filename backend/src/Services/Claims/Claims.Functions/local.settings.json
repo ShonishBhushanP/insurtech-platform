@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Services:Fraud": "http://localhost:5103",
+    "Services:Claims": "http://localhost:5102",
+    "Services:Payments": "http://localhost:5105"
+  }
+}

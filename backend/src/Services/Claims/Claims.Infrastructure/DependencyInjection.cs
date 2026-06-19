@@ -40,6 +40,22 @@ public static class DependencyInjection
             c.Timeout = TimeSpan.FromSeconds(5);
         });
 
+        // Adjudication driver: in-process (default) or delegate to Durable Functions (LLD A.1.3.2).
+        var mode = config.GetValue("Claims:Adjudication:Mode", "InProcess")!;
+        var functionsBase = config.GetValue<string?>("Claims:Adjudication:FunctionsBaseUrl", null);
+        if (mode.Equals("DurableFunctions", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(functionsBase))
+        {
+            services.AddHttpClient<IAdjudicationTrigger, DurableFunctionsAdjudicationTrigger>(c =>
+            {
+                c.BaseAddress = new Uri(functionsBase);
+                c.Timeout = TimeSpan.FromSeconds(10);
+            });
+        }
+        else
+        {
+            services.AddScoped<IAdjudicationTrigger, InProcessAdjudicationTrigger>();
+        }
+
         services.AddHostedService<OutboxDispatcher>();
         return services;
     }

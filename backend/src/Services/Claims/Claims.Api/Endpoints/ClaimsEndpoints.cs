@@ -93,6 +93,37 @@ public static class ClaimsEndpoints
 
             return Results.Ok(claim.ToStatusResponse());
         });
+
+        MapInternalEndpoints(app);
+    }
+
+    // Internal saga endpoints (LLD A.1.3.2). Called by the Durable Functions AdjudicationOrchestrator
+    // activities to advance the claim through the workflow. Not for public/customer use.
+    private static void MapInternalEndpoints(IEndpointRouteBuilder app)
+    {
+        var internalGroup = app.MapGroup("/internal/claims").WithTags("Claims (internal saga)");
+
+        internalGroup.MapPost("/{id:guid}/triage", async (Guid id, TriageRequest body, IClaimRepository repo, CancellationToken ct) =>
+            await Transition(id, repo, ct, c => c.ApplyTriage(body.Score, body.Decision)));
+
+        internalGroup.MapPost("/{id:guid}/refer", async (Guid id, ReferRequest body, IClaimRepository repo, CancellationToken ct) =>
+            await Transition(id, repo, ct, c => c.ReferForUnderwriting(body.Reason)));
+
+        internalGroup.MapPost("/{id:guid}/approve", async (Guid id, ApproveRequest body, IClaimRepository repo, CancellationToken ct) =>
+            await Transition(id, repo, ct, c => c.Approve(Money.Of(body.Amount, body.Currency))));
+
+        internalGroup.MapPost("/{id:guid}/paid", async (Guid id, PaidRequest body, IClaimRepository repo, CancellationToken ct) =>
+            await Transition(id, repo, ct, c => c.MarkPaid(body.Reference)));
+    }
+
+    private static async Task<IResult> Transition(Guid id, IClaimRepository repo, CancellationToken ct, Action<Domain.Aggregates.Claim> apply)
+    {
+        var claim = await repo.GetAsync(id, ct);
+        if (claim is null) return Error.NotFound("CLM-010", "Claim not found.").ToProblem("claims");
+        try { apply(claim); }
+        catch (InvalidOperationException ex) { return Error.Conflict("CLM-021", ex.Message).ToProblem("claims"); }
+        await repo.SaveChangesAsync(ct);
+        return Results.Ok(claim.ToStatusResponse());
     }
 
     private static async Task<IResult> GetClaim(Guid id, IClaimRepository repo, CancellationToken ct)
@@ -105,3 +136,9 @@ public static class ClaimsEndpoints
 }
 
 public record AdjusterDecisionRequest(string Outcome, decimal? ApprovedAmount, string? Reason);
+
+// Internal saga transition bodies (used by the Durable Functions activities).
+public record TriageRequest(double Score, string Decision);
+public record ReferRequest(string Reason);
+public record ApproveRequest(decimal Amount, string Currency);
+public record PaidRequest(string Reference);

@@ -1,6 +1,7 @@
 using InsurTech.BuildingBlocks.Hosting;
 using InsurTech.BuildingBlocks.Results;
 using InsurTech.BuildingBlocks.Web;
+using InsurTech.DocMgmt.Api.Ocr;
 using InsurTech.DocMgmt.Api.Storage;
 
 // Document Management service (LLD A.3). Issues short-lived pre-signed upload URLs and tracks
@@ -12,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddInsurTechKeyVault(builder.Configuration);
 builder.Services.AddInsurTechDefaults(builder.Configuration);
 builder.Services.AddDocumentStorage(builder.Configuration);
+builder.Services.AddDocumentExtraction(builder.Configuration);
 
 var app = builder.Build();
 app.UseInsurTechDefaults();
@@ -47,14 +49,20 @@ app.MapPost("/v1/documents/upload-url", async (UploadUrlRequest req, IUploadUrlI
         "DocumentUploaded"));
 }).WithTags("Documents");
 
-// Stub direct-PUT target (local issuer only) — stands in for Blob staging + malware scan + promotion.
-app.MapPut("/v1/documents/{id}/_staging-put", async (string id, IDocumentStore store, CancellationToken ct) =>
+// Stub direct-PUT target (local issuer only) — stands in for Blob staging + malware scan +
+// OCR/form-recognition (Document Intelligence) + immutable promotion.
+app.MapPut("/v1/documents/{id}/_staging-put", async (string id, IDocumentStore store, IDocumentExtraction ocr, CancellationToken ct) =>
 {
     var doc = await store.FindAsync(id, ct);
     if (doc is null) return Error.NotFound("DOC-010", "Document not found.").ToProblem("documents");
+
+    // Run OCR / form recognition, then promote.
+    doc.ExtractedFields = await ocr.ExtractAsync(doc.FileName, doc.MimeType, doc.SensitivityClass, documentUri: null, ct);
+    doc.OcrEngine = ocr.Engine;
     doc.Status = "Promoted";
     await store.UpsertAsync(doc, ct);
-    return Results.Ok(new { id, status = "Promoted", note = "malware-scan clean (stub); promoted to docs-immutable" });
+    return Results.Ok(new { id, status = "Promoted", ocrEngine = doc.OcrEngine, extractedFields = doc.ExtractedFields,
+        note = "malware-scan clean (stub); OCR complete; promoted to docs-immutable" });
 }).WithTags("Documents");
 
 // GET /v1/documents/{id}

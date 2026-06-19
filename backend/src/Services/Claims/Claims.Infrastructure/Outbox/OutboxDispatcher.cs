@@ -54,12 +54,13 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopeFactory, ILogger<
             await db.SaveChangesAsync(ct);
         }
 
-        // Run the saga in its own scope per claim (its own DbContext/unit of work).
+        // Start the saga per claim in its own scope. The trigger is either in-process or a
+        // Durable Functions orchestration, selected by config (Claims:Adjudication:Mode).
         foreach (var claimId in claimsToAdjudicate)
         {
             using var scope = scopeFactory.CreateScope();
-            var adjudication = scope.ServiceProvider.GetRequiredService<AdjudicationService>();
-            await adjudication.RunAsync(claimId, ct);
+            var trigger = scope.ServiceProvider.GetRequiredService<IAdjudicationTrigger>();
+            await trigger.TriggerAsync(claimId, ct);
         }
     }
 }

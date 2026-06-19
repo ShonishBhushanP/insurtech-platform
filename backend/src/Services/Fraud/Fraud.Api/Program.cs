@@ -1,3 +1,4 @@
+using InsurTech.BuildingBlocks.Ai;
 using InsurTech.BuildingBlocks.Hosting;
 using InsurTech.BuildingBlocks.Persistence;
 using InsurTech.Fraud.Api.Endpoints;
@@ -15,6 +16,9 @@ builder.Services.Configure<FraudOptions>(builder.Configuration.GetSection("Fraud
 
 // Optional Azure ML scoring endpoint (LLD A.2 / TR-05). Falls back to the local heuristic.
 builder.Services.AddScoringEngine(builder.Configuration);
+
+// Optional LLM (Claude / Azure OpenAI) for fraud analysis & summarization; null stub otherwise.
+builder.Services.AddInsurTechLlm(builder.Configuration);
 
 var app = builder.Build();
 app.UseInsurTechDefaults();

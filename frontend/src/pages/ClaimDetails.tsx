@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../api";
-import type { Claim } from "../types";
+import type { Claim, DocumentMeta } from "../types";
 import { Badge, LifecycleStepper, money, Section, when } from "../ui";
 
 // UI brief screen #2 — Claim Details & Lifecycle Tracking.
@@ -10,6 +10,7 @@ import { Badge, LifecycleStepper, money, Section, when } from "../ui";
 export default function ClaimDetails() {
   const { id = "" } = useParams();
   const [claim, setClaim] = useState<Claim | null>(null);
+  const [docMeta, setDocMeta] = useState<Record<string, DocumentMeta>>({});
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -22,6 +23,18 @@ export default function ClaimDetails() {
     const t = setInterval(load, 3000); // live progression while the saga runs
     return () => clearInterval(t);
   }, [load]);
+
+  // Fetch OCR / extracted fields for each attached document (once per doc set).
+  const docIdsKey = (claim?.documents ?? []).map((d) => d.documentId).join(",");
+  useEffect(() => {
+    (claim?.documents ?? []).forEach(async (d) => {
+      try {
+        const m = await api.getDocument(d.documentId);
+        setDocMeta((prev) => ({ ...prev, [d.documentId]: m }));
+      } catch { /* doc may not be promoted yet */ }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docIdsKey]);
 
   if (error) return <div className="alert error">{error}</div>;
   if (!claim) return <div className="spinner">Loading claim…</div>;
@@ -96,12 +109,30 @@ export default function ClaimDetails() {
 
           {docCount > 0 && (
             <ul className="timeline" style={{ marginTop: 12 }}>
-              {claim.documents.map((d) => (
-                <li key={d.documentId}>
-                  <div className="t-status">{d.type} {d.verified ? <span className="badge green">verified</span> : <span className="badge amber">pending</span>}</div>
-                  <div className="t-note"><code>{d.documentId}</code></div>
-                </li>
-              ))}
+              {claim.documents.map((d) => {
+                const meta = docMeta[d.documentId];
+                const fields = meta?.extractedFields
+                  ? Object.entries(meta.extractedFields).filter(([k]) => !k.startsWith("_"))
+                  : [];
+                return (
+                  <li key={d.documentId}>
+                    <div className="t-status">{d.type} {d.verified ? <span className="badge green">verified</span> : <span className="badge amber">pending</span>}</div>
+                    <div className="t-note"><code>{d.documentId}</code></div>
+                    {fields.length > 0 && (
+                      <div className="t-note" style={{ marginTop: 4 }}>
+                        <span className="badge blue">OCR · {meta?.ocrEngine}</span>
+                        <table style={{ marginTop: 6 }}>
+                          <tbody>
+                            {fields.map(([k, v]) => (
+                              <tr key={k}><td style={{ padding: "2px 8px 2px 0", color: "#64748b" }}>{k}</td><td style={{ padding: "2px 0" }}>{v}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
 

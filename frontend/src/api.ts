@@ -1,4 +1,4 @@
-import type { Claim, FileClaimResponse, FraudCase, Policy } from "./types";
+import type { Claim, DocumentMeta, FileClaimResponse, FraudAnalysis, FraudCase, Policy } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
 
@@ -83,9 +83,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // Simulate the direct-to-blob upload (loopback) so the OCR / promote pipeline runs.
+  promoteDocument: (id: string) => http<unknown>(`/v1/documents/${id}/_staging-put`, { method: "PUT" }),
+
+  getDocument: (id: string) => http<DocumentMeta>(`/v1/documents/${id}`),
+
   // ---- Fraud ----
   listFraudCases: (status?: string) =>
     http<FraudCase[]>(`/v1/fraud/cases${status ? `?status=${status}` : ""}`),
+
+  getFraudAnalysis: (caseId: string) => http<FraudAnalysis>(`/v1/fraud/cases/${caseId}/analysis`),
 
   decideFraudCase: (id: string, outcome: string, reason: string) =>
     http<FraudCase>(`/v1/fraud/cases/${id}/decision`, {

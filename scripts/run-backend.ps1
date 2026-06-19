@@ -14,6 +14,9 @@ $services = @(
   @{ Name = "Documents"; Path = "Services\Documents\DocMgmt.Api" },
   @{ Name = "Payments";  Path = "Services\Payments\Payments.Api" },
   @{ Name = "Partner";   Path = "Services\Partner\Partner.Api" },
+  @{ Name = "Underwriting"; Path = "Services\Underwriting\Underwriting.Api" },
+  @{ Name = "Notification"; Path = "Services\Notification\Notification.Api" },
+  @{ Name = "Audit";     Path = "Services\Audit\Audit.Api" },
   @{ Name = "Gateway";   Path = "Gateway\InsurTech.Gateway" }
 )
 

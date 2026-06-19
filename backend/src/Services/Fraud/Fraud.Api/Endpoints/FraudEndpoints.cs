@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using InsurTech.BuildingBlocks.Ai;
 using InsurTech.BuildingBlocks.Results;
 using InsurTech.BuildingBlocks.Web;
 using InsurTech.Fraud.Api.Contracts;
@@ -86,6 +87,48 @@ public static class FraudEndpoints
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToResponse(c));
         });
+
+        // GET /v1/fraud/cases/{id}/analysis — AI fraud analysis / summarization (LLD A.2.3.2).
+        // Uses the LLM (Claude / Azure OpenAI) when configured; else a deterministic rule-based brief.
+        cases.MapGet("/{id:guid}/analysis", async (Guid id, FraudDbContext db, ILlmClient llm, CancellationToken ct) =>
+        {
+            var c = await db.Cases.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (c is null) return Error.NotFound("FR-010", "Case not found.").ToProblem("fraud");
+
+            var shap = JsonSerializer.Deserialize<List<ShapContribution>>(c.ShapJson) ?? new();
+            string analysis;
+            string generatedBy;
+
+            if (llm.Enabled)
+            {
+                const string system = "You are a fraud investigation assistant for an insurer. Given a claim's risk "
+                    + "signals, write a concise (3-4 sentence) investigator briefing: the likely concern, which signals "
+                    + "drive it, and a recommended next step. Be factual, neutral, and do not invent facts.";
+                var user = $"Claim summary: {c.ClaimSummary}\nRisk score: {c.InitialScore:0.00} (severity {c.Severity})\n"
+                    + $"Duplicate suspected: {c.DuplicateSuspected}\nTop contributing features (SHAP): "
+                    + string.Join(", ", shap.Select(s => $"{s.Feature}={s.Value:0.00}"));
+                analysis = await llm.CompleteAsync(system, user, 400, ct);
+                generatedBy = llm.ModelName;
+                if (string.IsNullOrWhiteSpace(analysis)) { analysis = RuleBasedAnalysis(c, shap); generatedBy = "rule-based (LLM fallback)"; }
+            }
+            else
+            {
+                analysis = RuleBasedAnalysis(c, shap);
+                generatedBy = "rule-based";
+            }
+
+            return Results.Ok(new { caseId = c.Id.ToString(), claimId = c.ClaimId.ToString(), generatedBy, analysis });
+        });
+    }
+
+    private static string RuleBasedAnalysis(FraudCase c, List<ShapContribution> shap)
+    {
+        var top = shap.OrderByDescending(s => Math.Abs(s.Value)).Take(3).Select(s => s.Feature).ToList();
+        var band = c.InitialScore >= 0.85 ? "high-risk (auto-block band)" : c.InitialScore >= 0.55 ? "elevated-risk (refer band)" : "low-risk";
+        var dup = c.DuplicateSuspected ? " A duplicate/velocity pattern was also detected for this policy, raising concern of a repeat or staged submission." : "";
+        var feat = top.Count > 0 ? string.Join(", ", top) : "model residual signals";
+        return $"This claim scored {c.InitialScore:0.00} — {band}. The score is driven primarily by {feat}.{dup} "
+             + $"Recommended next step: {(c.InitialScore >= 0.85 ? "route to SIU for manual investigation and request supporting evidence before any payout." : "an adjuster should verify the supporting documents and incident details before approving.")}";
     }
 
     private static FraudCaseResponse ToResponse(FraudCase c)

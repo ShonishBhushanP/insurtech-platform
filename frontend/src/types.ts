@@ -56,6 +56,23 @@ export interface ShapContribution {
   value: number;
 }
 
+export interface DocumentMeta {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sensitivityClass: string;
+  status: string;
+  ocrEngine?: string | null;
+  extractedFields?: Record<string, string> | null;
+}
+
+export interface FraudAnalysis {
+  caseId: string;
+  claimId: string;
+  generatedBy: string;
+  analysis: string;
+}
+
 export interface FraudCase {
   caseId: string;
   claimId: string;

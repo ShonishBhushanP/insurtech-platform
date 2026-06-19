@@ -23,4 +23,8 @@ public class DocumentMetadata
     public string BlobName { get; set; } = default!;
     public string Status { get; set; } = "PendingUpload"; // PendingUpload → Scanned → Promoted → Quarantined
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    // OCR / form-recognition output (Azure Document Intelligence or local stub).
+    public string? OcrEngine { get; set; }
+    public Dictionary<string, string>? ExtractedFields { get; set; }
 }

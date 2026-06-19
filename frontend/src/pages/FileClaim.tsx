@@ -33,6 +33,8 @@ export default function FileClaim() {
           fileName, mimeType: "image/jpeg", sensitivityClass: "PII-Image",
           ownerPolicyId: policyId, relatedClaimId: null, expectedSizeBytes: 1048576,
         });
+        // Simulate the direct-to-blob upload so the scan + OCR (Document Intelligence) pipeline runs.
+        await api.promoteDocument(doc.documentId);
         attachments.push({ documentId: doc.documentId, type: "PhotoOfDamage" });
       }
 

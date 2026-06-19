@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { FraudCase } from "../types";
+import type { FraudAnalysis, FraudCase } from "../types";
 import { Badge, Section, when } from "../ui";
 
 // UI brief screen #4 — Fraud & Risk Alerts (Claims Ops / Adjuster UI).
@@ -95,6 +95,19 @@ function CaseDrawer({ c, onClose, onDecide }: {
 }) {
   const maxShap = Math.max(...c.shapTopN.map((s) => Math.abs(s.value)), 0.01);
   const closed = c.status === "ConfirmedFraud" || c.status === "ConfirmedLegit";
+
+  const [analysis, setAnalysis] = useState<FraudAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(true);
+  useEffect(() => {
+    let live = true;
+    setAnalyzing(true);
+    api.getFraudAnalysis(c.caseId)
+      .then((a) => { if (live) setAnalysis(a); })
+      .catch(() => { if (live) setAnalysis(null); })
+      .finally(() => { if (live) setAnalyzing(false); });
+    return () => { live = false; };
+  }, [c.caseId]);
+
   return (
     <div className="card" style={{ borderColor: "#1e40af" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -120,6 +133,20 @@ function CaseDrawer({ c, onClose, onDecide }: {
               <div className="shap-bar" style={{ width: `${(Math.abs(s.value) / maxShap) * 100}%` }} />
             </div>
           ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <label>AI fraud analysis</label>
+        <div className="alert info" style={{ margin: 0 }}>
+          {analyzing ? <span className="muted">Generating analysis…</span> : (
+            <>
+              <div style={{ marginBottom: 6 }}>
+                <span className="badge blue">{analysis?.generatedBy ?? "unavailable"}</span>
+              </div>
+              <div>{analysis?.analysis ?? "No analysis available."}</div>
+            </>
+          )}
         </div>
       </div>
 
