@@ -10,12 +10,40 @@ public interface IFraudScoringEngine
     Task<ScoreOutput> ScoreAsync(string claimType, decimal claimedAmount, string summary, bool duplicate, CancellationToken ct = default);
 }
 
-/// <summary>Local heuristic engine (default) — wraps <see cref="RiskScorer"/>.</summary>
+/// <summary>Local heuristic engine — wraps <see cref="RiskScorer"/>. Used as the universal fallback.</summary>
 public sealed class HeuristicScoringEngine(RiskScorer scorer) : IFraudScoringEngine
 {
     public string ModelVersion => RiskScorer.ModelVersion;
     public Task<ScoreOutput> ScoreAsync(string claimType, decimal claimedAmount, string summary, bool duplicate, CancellationToken ct = default)
         => Task.FromResult(scorer.Score(claimType, claimedAmount, summary, duplicate));
+}
+
+/// <summary>
+/// Custom ML.NET model engine (default when no AML endpoint is configured). Scores with the
+/// trained FastTree model; on any model error it degrades to the heuristic so scoring never fails.
+/// </summary>
+public sealed class MLNetScoringEngine(FraudModel model, HeuristicScoringEngine fallback, ILogger<MLNetScoringEngine> logger) : IFraudScoringEngine
+{
+    public string ModelVersion => FraudModel.Version;
+
+    public async Task<ScoreOutput> ScoreAsync(string claimType, decimal claimedAmount, string summary, bool duplicate, CancellationToken ct = default)
+    {
+        try
+        {
+            var (score, contributions) = model.Predict(claimType, claimedAmount, summary, duplicate);
+            var shap = contributions
+                .OrderByDescending(c => Math.Abs(c.Value))
+                .Take(5)
+                .Select(c => new ShapContribution(c.Feature, Math.Round(c.Value, 3)))
+                .ToList();
+            return new ScoreOutput(Math.Round(score, 4), shap);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "ML.NET scoring failed; falling back to heuristic");
+            return await fallback.ScoreAsync(claimType, claimedAmount, summary, duplicate, ct);
+        }
+    }
 }
 
 /// <summary>
@@ -70,9 +98,16 @@ public static class ScoringEngineRegistration
                 sp.GetRequiredService<HeuristicScoringEngine>(),
                 modelVersion));
         }
-        else
+        else if (string.Equals(config["Fraud:ScoringEngine"], "Heuristic", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IFraudScoringEngine, HeuristicScoringEngine>();
+        }
+        else
+        {
+            // Default: the custom ML.NET model (heuristic fallback inside the engine).
+            var modelPath = config["Fraud:Model:Path"] ?? Path.Combine(AppContext.BaseDirectory, "fraud-model.zip");
+            services.AddSingleton(sp => new FraudModel(modelPath, sp.GetRequiredService<ILogger<FraudModel>>()));
+            services.AddSingleton<IFraudScoringEngine, MLNetScoringEngine>();
         }
         return services;
     }

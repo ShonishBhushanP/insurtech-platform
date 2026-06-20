@@ -26,6 +26,7 @@ app.UseInsurTechDefaults();
 using (var scope = app.Services.CreateScope())
 {
     await scope.ServiceProvider.GetRequiredService<FraudDbContext>().EnsureInsurTechSchemaAsync();
+    scope.ServiceProvider.GetService<FraudModel>(); // train/load the ML.NET model at startup (if enabled)
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "fraud" }));
