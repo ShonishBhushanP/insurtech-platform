@@ -23,7 +23,7 @@ The frontend redeploys automatically via the GitHub Action on push. The two back
 
 ```bash
 RG=rg-azuser7069_mml.local-yyRMB
-ACR=insurtechacra7ad58ee
+ACR=insurtechacr103596    # confirm: az containerapp show -g $RG -n insurtech-gateway --query "properties.template.containers[0].image" -o tsv
 SWA=insurtech-ui-swa      # confirm: az staticwebapp list -o table
 
 # 0. Latest code
