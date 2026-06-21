@@ -158,5 +158,10 @@ The UI shows the briefing with its `generatedBy` provenance.
 - All engines **fail open / degrade gracefully** — a missing key or a provider error never breaks
   the claim or document pipeline; it falls back to the local engine.
 
+**Why substitutes instead of the Azure-native AI services?** See
+`docs/adr-001-ai-ml-substitutions.md` — the decision record covering the sandbox + cost
+constraints (Azure OpenAI access-gating, Azure ML endpoint standing cost, no RBAC) and the
+config switch-back path to full Azure fidelity.
+
 See also: `docs/fraud-model-card.md`, `docs/fraud-model-training-explained.md`,
 `infra/OPTION3-SAME-ORIGIN.md`.
