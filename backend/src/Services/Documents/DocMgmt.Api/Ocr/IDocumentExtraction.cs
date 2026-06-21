@@ -79,25 +79,100 @@ public sealed class LocalExtractionStub : IDocumentExtraction
             f["documentTypeVerified"] = "unverified (no content)";
         }
 
-        if (isImage)
-        {
-            f["documentType"] = "PhotoOfDamage";
-            f["damageDetected"] = "true";
-            f["estimatedSeverity"] = "Moderate";
-            f["vehiclePanel"] = "Rear bumper";
-            f["estimatedRepairCost"] = "INR 38,000 - 52,000";
-        }
-        else
-        {
-            f["documentType"] = sensitivityClass.Contains("Medical", StringComparison.OrdinalIgnoreCase) ? "MedicalBill" : "ClaimForm";
-            f["claimantName"] = "R. Sharma";
-            f["policyReference"] = "PL-2026-XXXXXX";
-            f["totalAmount"] = "45000.00";
-            f["currency"] = "INR";
-        }
+        // The stub can't read pixels, so it classifies the document from its file name + sensitivity
+        // class (the engine's stand-in for "what is this document?") and emits fields appropriate to
+        // that kind — instead of always returning vehicle-damage data. A real Document Intelligence
+        // model would derive these from the content itself.
+        foreach (var kv in FieldsFor(Classify(fileName, sensitivityClass, isImage)))
+            f[kv.Key] = kv.Value;
+
         f["_sourceFile"] = fileName;
         return Task.FromResult(f);
     }
+
+    private static string Classify(string fileName, string sensitivityClass, bool isImage)
+    {
+        var n = fileName.ToLowerInvariant();
+        bool Has(params string[] terms) => terms.Any(t => n.Contains(t));
+
+        if (Has("death", "demise") || (Has("life") && Has("certificate", "cert"))) return "DeathCertificate";
+        if (Has("medical", "hospital", "discharge", "diagnos", "prescription")
+            || sensitivityClass.Contains("Medical", StringComparison.OrdinalIgnoreCase)) return "MedicalReport";
+        if (Has("property", "fire", "flood", "burglary", "home")) return "PropertyDamage";
+        if (Has("damage", "motor", "vehicle", "accident", "dent", "collision", "bumper", "car")) return "MotorDamage";
+        if (Has("aadhaar", "aadhar", "pan", "passport", "license", "licence", "idproof", "kyc")) return "IdProof";
+        if (Has("invoice", "bill", "receipt", "estimate", "quotation")) return "Invoice";
+        return isImage ? "PhotoEvidence" : "ClaimForm";
+    }
+
+    private static Dictionary<string, string> FieldsFor(string kind) => kind switch
+    {
+        "DeathCertificate" => new()
+        {
+            ["documentType"] = "DeathCertificate",
+            ["deceasedName"] = "R. Sharma",
+            ["dateOfDeath"] = "2026-05-28",
+            ["certificateNumber"] = "DC-KA-2026-018452",
+            ["issuingAuthority"] = "Registrar of Births & Deaths, Bengaluru",
+            ["registrationDate"] = "2026-06-02",
+        },
+        "MedicalReport" => new()
+        {
+            ["documentType"] = "MedicalReport",
+            ["patientName"] = "R. Sharma",
+            ["hospitalName"] = "Manipal Hospital, Bengaluru",
+            ["admissionDate"] = "2026-06-04",
+            ["dischargeDate"] = "2026-06-09",
+            ["primaryDiagnosis"] = "Acute appendicitis (K35.80)",
+            ["billedAmount"] = "1,82,400",
+            ["currency"] = "INR",
+        },
+        "PropertyDamage" => new()
+        {
+            ["documentType"] = "PhotoOfDamage",
+            ["damageDetected"] = "true",
+            ["perilType"] = "Fire / smoke",
+            ["affectedArea"] = "Kitchen and adjoining wall",
+            ["estimatedSeverity"] = "Major",
+            ["estimatedRepairCost"] = "INR 2,10,000 - 2,80,000",
+        },
+        "MotorDamage" => new()
+        {
+            ["documentType"] = "PhotoOfDamage",
+            ["damageDetected"] = "true",
+            ["estimatedSeverity"] = "Moderate",
+            ["vehiclePanel"] = "Rear bumper",
+            ["estimatedRepairCost"] = "INR 38,000 - 52,000",
+        },
+        "IdProof" => new()
+        {
+            ["documentType"] = "IdentityProof",
+            ["holderName"] = "R. Sharma",
+            ["idType"] = "Aadhaar",
+            ["idNumber"] = "XXXX XXXX 4521",
+        },
+        "Invoice" => new()
+        {
+            ["documentType"] = "Invoice",
+            ["vendorName"] = "City Auto Works",
+            ["invoiceNumber"] = "INV-2026-7741",
+            ["totalAmount"] = "47,300",
+            ["currency"] = "INR",
+        },
+        "PhotoEvidence" => new()
+        {
+            ["documentType"] = "PhotoEvidence",
+            ["note"] = "Supporting photograph attached to the claim. No structured fields extracted.",
+        },
+        _ => new()
+        {
+            ["documentType"] = "ClaimForm",
+            ["claimantName"] = "R. Sharma",
+            ["policyReference"] = "PL-2026-XXXXXX",
+            ["totalAmount"] = "45000.00",
+            ["currency"] = "INR",
+        },
+    };
 }
 
 /// <summary>

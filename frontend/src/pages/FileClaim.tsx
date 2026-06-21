@@ -5,6 +5,19 @@ import { useAuth } from "../auth";
 import type { Policy } from "../types";
 import { money, Section } from "../ui";
 
+// Label an attachment by the claim type so downstream OCR/adjuster context is meaningful
+// (a Life claim image is a death certificate, not a photo of vehicle damage).
+function attachmentType(claimType: string, file: File): string {
+  if (!file.type.startsWith("image/")) return "ClaimDocument";
+  switch (claimType) {
+    case "Motor":
+    case "Property": return "PhotoOfDamage";
+    case "Life": return "DeathCertificate";
+    case "Health": return "MedicalDocument";
+    default: return "SupportingPhoto";
+  }
+}
+
 // UI brief screen #1 — File a Claim (Policy Holder / Agent UI).
 export default function FileClaim() {
   const nav = useNavigate();
@@ -40,7 +53,7 @@ export default function FileClaim() {
         });
         // Upload the bytes → scan + OCR (Document Intelligence) + promote pipeline.
         await api.promoteDocument(doc.documentId, file);
-        attachments.push({ documentId: doc.documentId, type: file.type.startsWith("image/") ? "PhotoOfDamage" : "ClaimDocument" });
+        attachments.push({ documentId: doc.documentId, type: attachmentType(claimType, file) });
       }
 
       const res = await api.fileClaim({

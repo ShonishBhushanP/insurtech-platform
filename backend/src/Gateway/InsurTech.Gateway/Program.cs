@@ -25,6 +25,16 @@ builder.Services.AddCors(o => o.AddPolicy("frontend", p => p
 
 var app = builder.Build();
 
+// When served same-origin behind an Azure Static Web Apps linked backend, the SWA proxies the
+// app's "/api/*" calls here. Strip a leading "/api" segment before routing so the existing
+// "/v1/..." routes match unchanged (no-op for direct "/v1/..." calls in local/dev).
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/api", out var rest))
+        ctx.Request.Path = rest.HasValue ? rest : "/";
+    await next();
+});
+
 app.UseCors("frontend");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "gateway" }));
 app.MapReverseProxy();
