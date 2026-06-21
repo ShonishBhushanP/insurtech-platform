@@ -6,11 +6,25 @@ function uuid(): string {
   return crypto.randomUUID();
 }
 
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+// Requests get a timeout so a cold-starting/stalled service surfaces a clear error
+// instead of an infinite spinner (Container Apps scale-to-zero can take ~20-30s to wake).
+async function http<T>(path: string, init?: RequestInit, timeoutMs = 75000): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+  } catch (e) {
+    if ((e as Error).name === "AbortError")
+      throw new Error("Request timed out — the service may be waking from idle. Please try again.");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -95,9 +109,15 @@ export const api = {
   promoteDocument: async (id: string, file?: File) => {
     const headers: Record<string, string> = {};
     if (file) headers["Content-Type"] = file.type || "application/octet-stream";
-    const res = await fetch(`${BASE}/v1/documents/${id}/_staging-put`, { method: "PUT", headers, body: file });
-    if (!res.ok) throw new Error(`${res.status} — document upload failed`);
-    return res.json();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 75000);
+    try {
+      const res = await fetch(`${BASE}/v1/documents/${id}/_staging-put`, { method: "PUT", headers, body: file, signal: ctrl.signal });
+      if (!res.ok) throw new Error(`${res.status} — document upload failed`);
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   },
 
   getDocument: (id: string) => http<DocumentMeta>(`/v1/documents/${id}`),

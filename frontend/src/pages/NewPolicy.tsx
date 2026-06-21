@@ -77,7 +77,9 @@ export default function NewPolicy() {
         </div>
 
         <div className="btn-row">
-          <button className="primary" onClick={submit} disabled={busy}>{busy ? "Issuing…" : "Issue policy"}</button>
+          <button className="primary" onClick={submit} disabled={busy}>
+            {busy ? "Issuing… (first request can take ~20s if the service is waking)" : "Issue policy"}
+          </button>
         </div>
         <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
           Underwriting re-computes the tariff server-side and rejects if the quote drifts &gt; 1% (API spec §3.1.6).

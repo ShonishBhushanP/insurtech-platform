@@ -98,7 +98,7 @@ export default function FileClaim() {
 
         <div className="btn-row">
           <button className="primary" onClick={submit} disabled={busy || !policyId}>
-            {busy ? "Submitting…" : "Submit claim"}
+            {busy ? "Submitting… (first request can take ~20s if the service is waking)" : "Submit claim"}
           </button>
         </div>
         <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
