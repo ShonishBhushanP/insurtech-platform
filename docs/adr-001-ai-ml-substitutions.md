@@ -27,11 +27,20 @@ This ADR records **why**.
 
 ## 2. The binding constraints
 
-These are properties of the sandbox, not preferences:
+These are properties of the sandbox, not preferences. **Note the three Azure AI services are *not*
+equally constrained** — only Azure OpenAI is a hard block:
+
+| Service | Available in sandbox? | Nature of the constraint |
+|---|---|---|
+| Azure OpenAI | ❌ No | **Access-gated** (Limited Access) — not grantable on a learner sub |
+| Document Intelligence | ✅ Yes (incl. free **F0** tier) | Standard AI service — substitution was a **cost/operational** choice, not a block |
+| Azure ML endpoint | ✅ Yes | Available, but **standing 24/7 compute cost** |
 
 1. **Azure OpenAI is gated behind a separate access approval.** It is a Limited Access service —
    you must apply with a business justification and be granted access on the subscription. A
-   learner sandbox cannot be granted it, so **Azure OpenAI was simply not provisionable**.
+   learner sandbox cannot be granted it, so **Azure OpenAI was simply not provisionable.** This is
+   the only one of the three AI services that is a *hard* block — and the reason the LLM tier had to
+   be substituted regardless of cost.
 2. **No RBAC / Managed Identity.** The account has **Contributor but not
    `Microsoft.Authorization/roleAssignments/write`**, so we cannot create the role assignments that
    Managed-Identity access to Document Intelligence / Azure ML / Azure OpenAI would normally use.
@@ -55,10 +64,19 @@ These are properties of the sandbox, not preferences:
 
 - **Substitute:** `ClaudeVisionExtraction` — sends the uploaded image/PDF to Claude's multimodal
   Messages API and parses the fields it reads.
-- **Why:** Document Intelligence is a **per-page paid resource** (S0) requiring a provisioned
-  account + key. For a demo with a handful of documents, a **pay-per-call** LLM with **no standing
-  cost** and **no provisioning** is cheaper and simpler, and Claude reads free-form documents
-  (death certificate, medical report, repair quote) without per-document model training.
+- **Availability:** Unlike Azure OpenAI, **Document Intelligence is *not* blocked** — it's a
+  standard Azure AI service (Contributor can create it) and has a **free F0 tier**. So this
+  substitution was a **choice, not a necessity.**
+- **Why we still substituted:** **operational consolidation.** The LLM tier *had* to be Claude
+  (Azure OpenAI unavailable), so the Anthropic key + `ILlmClient` path already existed. Reusing that
+  one provider for OCR avoided provisioning and securing a **second** AI resource + key under the
+  no-RBAC / 15-min-token / proxy friction. Document Intelligence is per-page paid on S0 (F0 is free
+  but quota-limited); Claude vision is pay-per-call with **no standing cost or provisioning** and
+  reads free-form documents (death certificate, medical report, repair quote) without per-document
+  model setup. Net: one AI provider to manage instead of two, at negligible cost.
+- **Easy to flip:** because DI *is* available, full OCR fidelity is genuinely one step away —
+  provision an F0/S0 Document Intelligence resource and set `Azure:DocIntel:Endpoint`/`Key`; the
+  `AzureDocumentIntelligenceClient` adapter (already built) takes over with no code change.
 - **Cost shape:** Document Intelligence ≈ a few ₹/USD-cents **per page** on a provisioned account;
   Claude vision ≈ **fractions of a cent per document**, billed only when a document is uploaded,
   **₹0 when idle.**
