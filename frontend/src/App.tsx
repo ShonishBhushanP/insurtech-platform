@@ -1,4 +1,4 @@
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth, type Role } from "./auth";
 import Login from "./pages/Login";
 import FileClaim from "./pages/FileClaim";
@@ -42,7 +42,10 @@ const HOME: Record<Role, string> = {
 
 function Shell() {
   const { session, logout } = useAuth();
+  const navigate = useNavigate();
   if (!session) return <Login />;
+
+  const signOut = () => { logout(); navigate("/", { replace: true }); };
 
   return (
     <>
@@ -55,7 +58,7 @@ function Shell() {
         </nav>
         <div className="role-switch" style={{ alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13 }}>{session.name} · <strong style={{ textTransform: "capitalize" }}>{session.role}</strong></span>
-          <button onClick={logout}>Sign out</button>
+          <button onClick={signOut}>Sign out</button>
         </div>
       </header>
       <main className="container">
