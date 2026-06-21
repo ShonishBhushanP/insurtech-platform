@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import type { Policy } from "../types";
-import { DEMO_USER, money, Section } from "../ui";
+import { money, Section } from "../ui";
 
-// UI brief screen #1 — File a Claim (Policy Holder UI).
+// UI brief screen #1 — File a Claim (Policy Holder / Agent UI).
 export default function FileClaim() {
   const nav = useNavigate();
+  const { session } = useAuth();
+  const userId = session?.userId ?? "usr_8b2";
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [policyId, setPolicyId] = useState("");
   const [claimType, setClaimType] = useState("Motor");
@@ -18,7 +21,7 @@ export default function FileClaim() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.listPolicies(DEMO_USER)
+    api.listPolicies(userId)
       .then((p) => { setPolicies(p); if (p[0]) setPolicyId(p[0].policyId); })
       .catch((e) => setError(String(e)));
   }, []);
@@ -46,7 +49,7 @@ export default function FileClaim() {
         incidentLocation: { lat: 12.9716, lng: 77.5946, address: "MG Road, Bengaluru" },
         description, estimatedAmount: amount, currency: "INR",
         attachments,
-        filedBy: { userId: DEMO_USER, channel: "WebMFE" },
+        filedBy: { userId, channel: session?.channel ?? "WebMFE" },
       });
       nav(`/claims/${res.claimId}`);
     } catch (e) {

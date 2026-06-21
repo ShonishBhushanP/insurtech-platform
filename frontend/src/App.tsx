@@ -1,63 +1,76 @@
-import { useState } from "react";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth, type Role } from "./auth";
+import Login from "./pages/Login";
 import FileClaim from "./pages/FileClaim";
 import RecentClaims from "./pages/RecentClaims";
 import ClaimDetails from "./pages/ClaimDetails";
 import FraudAlerts from "./pages/FraudAlerts";
 import UnderwritingQueue from "./pages/UnderwritingQueue";
+import MyPolicies from "./pages/MyPolicies";
+import NewPolicy from "./pages/NewPolicy";
 
-type Role = "customer" | "adjuster";
+// Nav links per persona (the architecture's micro-frontends, role-switched in one shell).
+const NAV: Record<Role, { to: string; label: string }[]> = {
+  customer: [
+    { to: "/file-claim", label: "File a Claim" },
+    { to: "/claims", label: "My Claims" },
+    { to: "/policies", label: "My Policies" },
+  ],
+  agent: [
+    { to: "/policies", label: "Policies" },
+    { to: "/policies/new", label: "Onboard Policy" },
+    { to: "/file-claim", label: "File a Claim" },
+    { to: "/claims", label: "Claims" },
+  ],
+  adjuster: [
+    { to: "/fraud", label: "Fraud & Risk Alerts" },
+    { to: "/underwriting", label: "Underwriting Queue" },
+  ],
+};
 
-function Header({ role, setRole }: { role: Role; setRole: (r: Role) => void }) {
-  const nav = useNavigate();
-  function switchRole(r: Role) {
-    setRole(r);
-    nav(r === "customer" ? "/claims" : "/fraud");
-  }
+const HOME: Record<Role, string> = { customer: "/claims", agent: "/policies", adjuster: "/fraud" };
+
+function Shell() {
+  const { session, logout } = useAuth();
+  if (!session) return <Login />;
+
   return (
-    <header className="app-header">
-      <div className="brand">
-        🛡️ InsurTech <small>Digital Insurance Claims &amp; Policy Platform</small>
-      </div>
-      <nav className="nav">
-        {role === "customer" ? (
-          <>
-            <NavLink to="/file-claim" className={({ isActive }) => (isActive ? "active" : "")}>File a Claim</NavLink>
-            <NavLink to="/claims" className={({ isActive }) => (isActive ? "active" : "")}>My Claims</NavLink>
-          </>
-        ) : (
-          <>
-            <NavLink to="/fraud" className={({ isActive }) => (isActive ? "active" : "")}>Fraud &amp; Risk Alerts</NavLink>
-            <NavLink to="/underwriting" className={({ isActive }) => (isActive ? "active" : "")}>Underwriting Queue</NavLink>
-          </>
-        )}
-      </nav>
-      <div className="role-switch">
-        <button className={role === "customer" ? "active" : ""} onClick={() => switchRole("customer")}>Customer Portal</button>
-        <button className={role === "adjuster" ? "active" : ""} onClick={() => switchRole("adjuster")}>Adjuster Workbench</button>
-      </div>
-    </header>
+    <>
+      <header className="app-header">
+        <div className="brand">🛡️ InsurTech <small>Digital Insurance Platform</small></div>
+        <nav className="nav">
+          {NAV[session.role].map((n) => (
+            <NavLink key={n.to} to={n.to} className={({ isActive }) => (isActive ? "active" : "")}>{n.label}</NavLink>
+          ))}
+        </nav>
+        <div className="role-switch" style={{ alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13 }}>{session.name} · <strong style={{ textTransform: "capitalize" }}>{session.role}</strong></span>
+          <button onClick={logout}>Sign out</button>
+        </div>
+      </header>
+      <main className="container">
+        <Routes>
+          <Route path="/" element={<Navigate to={HOME[session.role]} replace />} />
+          <Route path="/file-claim" element={<FileClaim />} />
+          <Route path="/claims" element={<RecentClaims />} />
+          <Route path="/claims/:id" element={<ClaimDetails />} />
+          <Route path="/policies" element={<MyPolicies />} />
+          <Route path="/policies/new" element={<NewPolicy />} />
+          <Route path="/fraud" element={<FraudAlerts />} />
+          <Route path="/underwriting" element={<UnderwritingQueue />} />
+          <Route path="*" element={<Navigate to={HOME[session.role]} replace />} />
+        </Routes>
+      </main>
+    </>
   );
 }
 
 export default function App() {
-  const [role, setRole] = useState<Role>(() => (localStorage.getItem("role") as Role) || "customer");
-  function update(r: Role) { setRole(r); localStorage.setItem("role", r); }
-
   return (
-    <BrowserRouter>
-      <Header role={role} setRole={update} />
-      <main className="container">
-        <Routes>
-          <Route path="/" element={<Navigate to={role === "customer" ? "/claims" : "/fraud"} replace />} />
-          <Route path="/file-claim" element={<FileClaim />} />
-          <Route path="/claims" element={<RecentClaims />} />
-          <Route path="/claims/:id" element={<ClaimDetails />} />
-          <Route path="/fraud" element={<FraudAlerts />} />
-          <Route path="/underwriting" element={<UnderwritingQueue />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Shell />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

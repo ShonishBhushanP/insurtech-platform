@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import type { Claim } from "../types";
-import { Badge, DEMO_USER, money, Section, when } from "../ui";
+import { Badge, money, Section, when } from "../ui";
 
 // UI brief screen #3 — Recent Claims Dashboard (customer + agent reuse).
 export default function RecentClaims() {
+  const { session } = useAuth();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
-    try { setClaims(await api.listClaims({ userId: DEMO_USER })); }
+    try { setClaims(await api.listClaims({ userId: session?.userId })); }
     catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }

@@ -30,6 +30,13 @@ export const api = {
   listPolicies: (userId?: string) =>
     http<Policy[]>(`/v1/policies${userId ? `?userId=${userId}` : ""}`),
 
+  createPolicy: (body: unknown) =>
+    http<Policy>("/v1/policies", {
+      method: "POST",
+      headers: { "Idempotency-Key": uuid() },
+      body: JSON.stringify(body),
+    }),
+
   // ---- Claims ----
   fileClaim: (body: unknown) =>
     http<FileClaimResponse>("/v1/claims", {
