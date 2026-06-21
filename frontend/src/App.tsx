@@ -8,6 +8,8 @@ import FraudAlerts from "./pages/FraudAlerts";
 import UnderwritingQueue from "./pages/UnderwritingQueue";
 import MyPolicies from "./pages/MyPolicies";
 import NewPolicy from "./pages/NewPolicy";
+import PartnerDashboard from "./pages/PartnerDashboard";
+import CompliancePortal from "./pages/CompliancePortal";
 
 // Nav links per persona (the architecture's micro-frontends, role-switched in one shell).
 const NAV: Record<Role, { to: string; label: string }[]> = {
@@ -26,9 +28,17 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
     { to: "/fraud", label: "Fraud & Risk Alerts" },
     { to: "/underwriting", label: "Underwriting Queue" },
   ],
+  partner: [
+    { to: "/partner", label: "Cashless Authorization" },
+  ],
+  compliance: [
+    { to: "/compliance", label: "Audit & Reports" },
+  ],
 };
 
-const HOME: Record<Role, string> = { customer: "/claims", agent: "/policies", adjuster: "/fraud" };
+const HOME: Record<Role, string> = {
+  customer: "/claims", agent: "/policies", adjuster: "/fraud", partner: "/partner", compliance: "/compliance",
+};
 
 function Shell() {
   const { session, logout } = useAuth();
@@ -58,6 +68,8 @@ function Shell() {
           <Route path="/policies/new" element={<NewPolicy />} />
           <Route path="/fraud" element={<FraudAlerts />} />
           <Route path="/underwriting" element={<UnderwritingQueue />} />
+          <Route path="/partner" element={<PartnerDashboard />} />
+          <Route path="/compliance" element={<CompliancePortal />} />
           <Route path="*" element={<Navigate to={HOME[session.role]} replace />} />
         </Routes>
       </main>

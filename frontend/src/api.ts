@@ -1,4 +1,4 @@
-import type { Claim, DocumentMeta, FileClaimResponse, FraudAnalysis, FraudCase, Policy } from "./types";
+import type { AuditEvent, CashlessAuthorization, Claim, DocumentMeta, FileClaimResponse, FraudAnalysis, FraudCase, Policy } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
 
@@ -116,4 +116,26 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ outcome, reason }),
     }),
+
+  // ---- Partner (cashless authorization) ----
+  authorizeCashless: (body: unknown) =>
+    http<CashlessAuthorization>("/v1/partner/cashless/authorize", {
+      method: "POST",
+      headers: { "Idempotency-Key": uuid() },
+      body: JSON.stringify(body),
+    }),
+
+  // ---- Audit & Compliance ----
+  auditQuery: (params: { entity?: string; action?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.entity) qs.set("entity", params.entity);
+    if (params.action) qs.set("action", params.action);
+    const q = qs.toString();
+    return http<AuditEvent[]>(`/v1/audit/query${q ? `?${q}` : ""}`);
+  },
+  appendAudit: (body: unknown) =>
+    http<AuditEvent>("/v1/audit/events", { method: "POST", body: JSON.stringify(body) }),
+  auditVerify: () =>
+    http<{ entries: number; verified: number; chainIntact: boolean }>("/v1/audit/verify"),
+  generateReport: (type: string) => http<Record<string, unknown>>(`/v1/reports/${type}`),
 };

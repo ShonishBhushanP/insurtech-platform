@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 
 // Persona model. In production these come from a Microsoft Entra ID / Entra External ID (B2C)
 // OIDC token (roles/scopes claims); here a mock login sets the session so the persona UIs work.
-export type Role = "customer" | "agent" | "adjuster";
+export type Role = "customer" | "agent" | "adjuster" | "partner" | "compliance";
 
 export interface Session {
   role: Role;

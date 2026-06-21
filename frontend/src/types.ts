@@ -73,6 +73,30 @@ export interface FraudAnalysis {
   analysis: string;
 }
 
+export interface CashlessAuthorization {
+  authorizationId: string;
+  authorizationStatus: string;
+  approvedAmount: number;
+  coPayAmount: number;
+  currency: string;
+  validUntil: string;
+  responseCode: string;
+  responseMessage: string;
+  referenceClaimId: string;
+  settlementSla: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  actor: string;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  timestamp: string;
+  prevHash: string;
+  hash: string;
+}
+
 export interface FraudCase {
   caseId: string;
   claimId: string;
