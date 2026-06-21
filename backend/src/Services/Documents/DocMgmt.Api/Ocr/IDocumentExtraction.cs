@@ -194,8 +194,13 @@ public sealed class AzureDocumentIntelligenceClient(HttpClient http, string apiK
         else if (content is { Length: > 0 }) body = new { base64Source = Convert.ToBase64String(content) };
         else return result;
 
+        // v4.0 (2024-11-30): the general "prebuilt-document" model is retired; key/value extraction
+        // is done with "prebuilt-layout" + the keyValuePairs add-on feature. Request it for layout.
+        var query = "api-version=2024-11-30";
+        if (model.Contains("layout", StringComparison.OrdinalIgnoreCase)) query += "&features=keyValuePairs";
+
         using var submit = new HttpRequestMessage(HttpMethod.Post,
-            $"/documentintelligence/documentModels/{model}:analyze?api-version=2024-11-30")
+            $"/documentintelligence/documentModels/{model}:analyze?{query}")
         {
             Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
         };

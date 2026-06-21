@@ -18,7 +18,7 @@ public static class OcrRegistration
 
         if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(key))
         {
-            var model = config["Azure:DocIntel:Model"] ?? "prebuilt-document";
+            var model = config["Azure:DocIntel:Model"] ?? "prebuilt-layout";
             services.AddHttpClient("docintel", c =>
             {
                 c.BaseAddress = new Uri(endpoint);
