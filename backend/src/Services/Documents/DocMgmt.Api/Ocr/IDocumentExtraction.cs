@@ -187,6 +187,23 @@ public sealed class AzureDocumentIntelligenceClient(HttpClient http, string apiK
     public async Task<Dictionary<string, string>> ExtractAsync(string fileName, string mimeType, string sensitivityClass,
         string? documentUri, byte[]? content, CancellationToken ct = default)
     {
+        try
+        {
+            var result = await AnalyzeAsync(fileName, documentUri, content, ct);
+            // Only treat it as a success if real fields came back (ignore the "_" bookkeeping keys).
+            if (result is not null && result.Keys.Any(k => !k.StartsWith('_')))
+                return result;
+        }
+        catch { /* fall through to graceful degrade — never fail the upload on an OCR error */ }
+
+        // Degrade (e.g. F0 add-on limits, transient error, no fields read) instead of 500-ing.
+        var fallback = await new LocalExtractionStub().ExtractAsync(fileName, mimeType, sensitivityClass, documentUri, content, ct);
+        fallback["_extractionNote"] = "Azure Document Intelligence returned no fields — showing representative values";
+        return fallback;
+    }
+
+    private async Task<Dictionary<string, string>?> AnalyzeAsync(string fileName, string? documentUri, byte[]? content, CancellationToken ct)
+    {
         var result = new Dictionary<string, string> { ["_sourceFile"] = fileName };
 
         object body;
