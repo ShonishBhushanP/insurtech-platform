@@ -29,13 +29,17 @@ if ($env:USERPROFILE) {
 }
 
 $repo = Split-Path -Parent $PSScriptRoot
-$proj = Join-Path $repo "backend\src\Services\Claims\Claims.Functions"
+# Forward slashes work on Windows and Linux (.NET/Cloud Shell pwsh); backslash literals don't on Linux.
+$proj = Join-Path $repo "backend/src/Services/Claims/Claims.Functions"
 $publish = Join-Path $proj "publish"
 $zip = Join-Path $proj "functions.zip"
 
-# 1. Publish + zip the Functions app
-Write-Host "==> Publishing Claims.Functions"
-& "C:\Program Files\dotnet\dotnet.exe" publish $proj -c Release -o $publish
+# 1. Publish + zip the Functions app. Resolve dotnet from PATH (Cloud Shell/Linux); fall back to the
+#    default Windows install path only if it isn't on PATH.
+$dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
+if (-not $dotnet) { $dotnet = "C:\Program Files\dotnet\dotnet.exe" }
+Write-Host "==> Publishing Claims.Functions (dotnet: $dotnet)"
+& $dotnet publish $proj -c Release -o $publish
 if ($LASTEXITCODE -ne 0) { Write-Host "publish failed"; exit 1 }
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $zip -Force
