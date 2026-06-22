@@ -1,9 +1,7 @@
 # Build Prompt — InsurTech Digital Insurance Platform (Phase 3 Execution)
 
-> This is the instruction set I (the author) would give an AI engineering agent to design and build
-> this platform from scratch. It's written as a prompt: my requirements, my constraints, the
-> artifacts to follow, and the deliverables I expect. Hand this to the agent along with the
-> `Final Docs/` folder.
+> This is the instruction set I would give an AI engineering agent to design and build
+> this platform from scratch. 
 
 ---
 
