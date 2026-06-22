@@ -1,7 +1,9 @@
+using InsurTech.BuildingBlocks.Messaging;
 using InsurTech.Claims.Application.Adjudication;
 using InsurTech.Claims.Domain.Events;
 using InsurTech.Claims.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -37,6 +39,9 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopeFactory, ILogger<
         using (var scope = scopeFactory.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ClaimsDbContext>();
+            var bus = scope.ServiceProvider.GetRequiredService<IEventBus>();
+            var topic = scope.ServiceProvider.GetRequiredService<IConfiguration>()["Azure:ServiceBus:Topic"] ?? "claims-events";
+
             var batch = await db.OutboxEvents
                 .Where(o => o.DispatchedUtc == null)
                 .OrderBy(o => o.CreatedUtc)
@@ -47,6 +52,19 @@ public sealed class OutboxDispatcher(IServiceScopeFactory scopeFactory, ILogger<
 
             foreach (var msg in batch)
             {
+                // Publish to the bus (InMemory locally / real Service Bus when configured). Best-effort:
+                // a publish failure must not block the adjudication saga, so we log and still stamp.
+                try
+                {
+                    await bus.PublishAsync(new OutboxIntegrationEvent(msg.EventType, msg.AggregateId, msg.Payload, topic), ct);
+                }
+                catch (Exception ex)
+                {
+                    msg.DispatchAttempts++;
+                    logger.LogWarning(ex, "Outbox publish to bus failed (best-effort) for {EventType} (aggregate {AggregateId})",
+                        msg.EventType, msg.AggregateId);
+                }
+
                 logger.LogInformation("Outbox → bus: {EventType} (aggregate {AggregateId})", msg.EventType, msg.AggregateId);
                 msg.DispatchedUtc = DateTimeOffset.UtcNow;
                 if (msg.EventType == nameof(ClaimFiled)) claimsToAdjudicate.Add(msg.AggregateId);

@@ -68,9 +68,19 @@ public static class ServiceDefaults
 
     private static void AddEventBus(IServiceCollection services, IConfiguration config)
     {
+        var connectionString = config["Azure:ServiceBus:ConnectionString"];
         var ns = config["Azure:ServiceBus:FullyQualifiedNamespace"];
-        if (!string.IsNullOrWhiteSpace(ns))
+
+        if (!string.IsNullOrWhiteSpace(connectionString))
         {
+            // SAS connection-string auth — works with Contributor only (no RBAC role assignment),
+            // so real Service Bus can run on the sandbox. Preferred when present.
+            services.AddSingleton(_ => new global::Azure.Messaging.ServiceBus.ServiceBusClient(connectionString));
+            services.AddSingleton<IEventBus, ServiceBusEventBus>();
+        }
+        else if (!string.IsNullOrWhiteSpace(ns))
+        {
+            // Namespace + Managed Identity — the production-secure path (needs an RBAC role assignment).
             services.AddSingleton(_ => new global::Azure.Messaging.ServiceBus.ServiceBusClient(ns, AzureCredential.Instance));
             services.AddSingleton<IEventBus, ServiceBusEventBus>();
         }
