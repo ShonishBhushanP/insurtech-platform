@@ -78,4 +78,126 @@ public class ClaimAggregateTests
         var act = () => Money.Of(100m, "RUPEE");
         act.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void ApplyTriage_allow_moves_to_Triaged_and_raises_event()
+    {
+        var claim = NewFiledClaim();
+
+        claim.ApplyTriage(0.10, "allow");
+
+        claim.Status.Should().Be(ClaimStatus.Triaged);
+        claim.FraudDecision.Should().Be("allow");
+        claim.DocumentsVerified.Should().BeTrue();
+        claim.DomainEvents.Should().ContainSingle(e => e is ClaimTriaged);
+    }
+
+    [Fact]
+    public void ReferForUnderwriting_sets_status_reason_and_raises_event()
+    {
+        var claim = NewFiledClaim();
+        claim.ApplyTriage(0.70, "refer");
+
+        claim.ReferForUnderwriting("Fraud risk in refer band.");
+
+        claim.Status.Should().Be(ClaimStatus.ReferredForUnderwriting);
+        claim.DecisionReason.Should().Contain("refer band");
+        claim.DomainEvents.Should().ContainSingle(e => e is ClaimReferred);
+    }
+
+    [Fact]
+    public void Underwriter_can_Approve_a_referred_claim()
+    {
+        var claim = NewFiledClaim();
+        claim.ApplyTriage(0.70, "refer");
+        claim.ReferForUnderwriting("over threshold");
+
+        claim.Approve(Money.Of(45000m));
+
+        claim.Status.Should().Be(ClaimStatus.Approved);
+        claim.ApprovedAmount.Should().Be(45000m);
+    }
+
+    [Fact]
+    public void Reject_from_Triaged_sets_reason_and_raises_event()
+    {
+        var claim = NewFiledClaim();
+        claim.ApplyTriage(0.70, "refer");
+
+        claim.Reject("Policy lapsed at incident date.");
+
+        claim.Status.Should().Be(ClaimStatus.Rejected);
+        claim.DecisionReason.Should().Be("Policy lapsed at incident date.");
+        claim.DomainEvents.Should().ContainSingle(e => e is ClaimRejected);
+    }
+
+    [Fact]
+    public void Reject_after_Paid_is_rejected_by_state_machine()
+    {
+        var claim = NewFiledClaim();
+        claim.ApplyTriage(0.10, "allow");
+        claim.Approve(Money.Of(45000m));
+        claim.MarkPaid("NEFT123");
+
+        var act = () => claim.Reject("too late");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*CLM-021*");
+    }
+
+    [Fact]
+    public void MarkPaid_without_Approve_is_rejected_by_state_machine()
+    {
+        var claim = NewFiledClaim();
+        claim.ApplyTriage(0.10, "allow"); // Triaged, not Approved
+
+        var act = () => claim.MarkPaid("NEFT123");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*CLM-021*");
+    }
+
+    [Fact]
+    public void Cancel_from_Filed_succeeds_and_raises_event()
+    {
+        var claim = NewFiledClaim();
+
+        claim.Cancel();
+
+        claim.Status.Should().Be(ClaimStatus.Cancelled);
+        claim.DomainEvents.Should().ContainSingle(e => e is ClaimCancelled);
+    }
+
+    [Fact]
+    public void ApplyTriage_on_a_terminal_claim_throws()
+    {
+        var claim = NewFiledClaim();
+        claim.Cancel();
+
+        var act = () => claim.ApplyTriage(0.10, "allow");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*CLM-021*");
+    }
+
+    [Fact]
+    public void File_with_documents_populates_Documents()
+    {
+        var docs = new[] { new ClaimDocument("doc_1", "PhotoOfDamage") };
+        var claim = Claim.File(Guid.NewGuid(), ClaimType.Motor, "usr_1",
+            DateTimeOffset.UtcNow.AddDays(-1), "collision", "MG Road", Money.Of(45000m), docs);
+
+        claim.Documents.Should().ContainSingle(d => d.DocumentId == "doc_1" && d.Type == "PhotoOfDamage");
+    }
+
+    [Fact]
+    public void State_transitions_record_history_and_bump_rowversion()
+    {
+        var claim = NewFiledClaim();
+        var initialVersion = claim.RowVersion;
+        var initialHistory = claim.History.Count;
+
+        claim.ApplyTriage(0.10, "allow");
+        claim.Approve(Money.Of(45000m));
+
+        claim.RowVersion.Should().NotBe(initialVersion); // Approve bumps the concurrency token
+        claim.History.Count.Should().BeGreaterThan(initialHistory); // each transition appends a history entry
+    }
 }
