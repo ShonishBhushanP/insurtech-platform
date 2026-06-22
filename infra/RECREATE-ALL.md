@@ -160,6 +160,28 @@ done
 
 ---
 
+## Phase 7 — Optional: Durable Functions adjudication (architecture-faithful workflow)
+
+By default the claims saga runs **in-process** (reliable, no cold start — recommended for demos).
+To instead run it as the LLD's **Durable Functions** orchestration (see `docs/adr-003-claims-workflow.md`):
+
+```powershell
+# PowerShell Cloud Shell — provisions a Function App + storage and deploys the orchestrator
+cd ~/insurtech-platform/infra
+$gw = "https://$(az containerapp show -g rg-azuser7069_mml.local-yyRMB -n insurtech-gateway --query 'properties.configuration.ingress.fqdn' -o tsv)"
+./deploy-functions.ps1 -ResourceGroup rg-azuser7069_mml.local-yyRMB -ClaimsUrl $gw -FraudUrl $gw -PaymentsUrl $gw
+```
+```bash
+# Bash — point the claims service at the Function App (use the fn host the script printed)
+RG=rg-azuser7069_mml.local-yyRMB
+az containerapp update -g $RG -n insurtech-claims \
+  --set-env-vars Claims__Adjudication__Mode=DurableFunctions Claims__Adjudication__FunctionsBaseUrl="https://<fn-host>" -o none
+```
+Revert to in-process: `az containerapp update -g $RG -n insurtech-claims --remove-env-vars Claims__Adjudication__Mode Claims__Adjudication__FunctionsBaseUrl -o none`.
+The orchestrator calls back through the **public gateway** (services are internal), so all three URLs are the gateway URL. Consumption Functions cold-start ~5–10s — deploy and dry-run it *before* a demo, don't first-try it live.
+
+---
+
 ## Teardown after the demo (avoid standing cost)
 ```bash
 az servicebus namespace delete -g $RG -n $SB          # Standard SB base cost
