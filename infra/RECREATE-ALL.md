@@ -53,11 +53,12 @@ echo "$SQL_CS"
 ## Phase 2 — Static Web App (create early to get its hostname)  *(az; either shell)*
 
 ```bash
-az staticwebapp create -n $SWA -g $RG -l eastasia2 --sku Standard
+az staticwebapp create -n $SWA -g $RG -l eastasia --sku Standard
 SWA_HOST=$(az staticwebapp show -n $SWA -g $RG --query defaultHostname -o tsv)
 echo "SWA = https://$SWA_HOST"
 ```
-*(If `eastasia2` isn't accepted, use any supported SWA region, e.g. `centralus` / `eastasia`.)*
+*(Static Web Apps regions are limited to: `centralus, eastus2, westus2, westeurope, eastasia`.
+`eastasia` is closest to a `centralindia` backend; the linked backend works cross-region.)*
 
 ---
 
